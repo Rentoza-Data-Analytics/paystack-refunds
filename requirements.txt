@@ -1,0 +1,7 @@
+paramiko==2.8.1
+python-dotenv
+pandas
+google-cloud-bigquery
+pyarrow
+pandas-gbq
+numpy

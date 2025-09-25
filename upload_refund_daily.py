@@ -142,6 +142,8 @@ def enforce_schema(df: pd.DataFrame) -> pd.DataFrame:
                 df[col] = pd.to_datetime(df[col], errors="coerce")
             elif bq_type == "DATE":
                 df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+            elif bq_type == "NUMERIC":
+                df[col] = df[col].astype("float64").astype(str).map(decimal.Decimal)
             else:
                 df[col] = df[col].astype(BQ_TO_PD_DTYPES[bq_type], errors="ignore")
         except Exception as e:

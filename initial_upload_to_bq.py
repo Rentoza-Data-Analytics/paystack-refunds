@@ -8,6 +8,7 @@ import os
 import glob
 import logging
 import pandas as pd
+import decimal
 from google.cloud import bigquery
 from dotenv import load_dotenv
 
@@ -19,9 +20,9 @@ load_dotenv()
 
 # Config
 DOWNLOAD_DIR = "downloads"
-PROJECT_ID = os.getenv("BIGQUERY_PROJECT_ID")
-DATASET_ID = os.getenv("BIGQUERY_DATASET")
-TABLE_ID = os.getenv("BIGQUERY_TABLE")
+PROJECT_ID = os.getenv("BQ_PROJECT")
+DATASET_ID = os.getenv("BQ_DATASET")
+TABLE_ID = os.getenv("BQ_TABLE")
 
 # Full table path
 BQ_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
@@ -73,32 +74,24 @@ BQ_TO_PD_DTYPES = {
 
 def enforce_schema(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure dataframe matches the BigQuery schema exactly"""
-    # Normalize column names: strip spaces, unify casing
-    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')  # remove leading/trailing spaces
-
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
     for field in BIGQUERY_SCHEMA:
         col, bq_type = field.name, field.field_type
-
-        # Add missing column
         if col not in df.columns:
-            logging.warning(f"Adding missing column: {col}")
             df[col] = pd.NA
-
-        # Apply type conversion
         try:
             if bq_type == "TIMESTAMP":
                 df[col] = pd.to_datetime(df[col], errors="coerce")
             elif bq_type == "DATE":
                 df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+            elif bq_type == "NUMERIC":
+                df[col] = df[col].astype("float64").astype(str).map(decimal.Decimal)
             else:
                 df[col] = df[col].astype(BQ_TO_PD_DTYPES[bq_type], errors="ignore")
         except Exception as e:
-            logging.error(f"Failed to cast {col} to {bq_type}: {e}")
+            logging.error(f"Failed casting {col}: {e}")
             df[col] = pd.NA
-
-    # Drop extra columns not in schema
-    df = df[[f.name for f in BIGQUERY_SCHEMA]]
-    return df
+    return df[[f.name for f in BIGQUERY_SCHEMA]]
 
 
 def load_csv_files(download_dir: str) -> pd.DataFrame:
